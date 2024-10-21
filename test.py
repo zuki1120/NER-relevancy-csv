@@ -50,13 +50,24 @@ def ner_relevancy(df, index, all_results, check_att, margin, target_weights):
     tfidf_tags_dict = all_results[df.loc[index, 'tf-idf'].lower()]
     semantic_tags_dict = all_results[df.loc[index, 'semantic_model'].lower()]
 
-    # 計算 query tags 與 tf-idf 的 tags 相關性
-    tfidf_relevancy_score = calculate_weighted_relevancy(query_tags_dict, tfidf_tags_dict, check_att, margin, target_weights)
-    df.loc[index, 'ner_relevancy_1'] = 2 if tfidf_relevancy_score >= 0.7 else (1 if tfidf_relevancy_score >= 0.35 else 0)
+    query_tags_pool = set(ent[0] for ents in query_tags_dict.values() for ent in ents if ent)
+    tfidf_tags_pool = set(ent[0] for ents in tfidf_tags_dict.values() for ent in ents if ent)
+    semantic_tags_pool = set(ent[0] for ents in semantic_tags_dict.values() for ent in ents if ent)
 
-    # 計算 query tags 與 semantic model 的 tags 相關性
-    semantic_relevancy_score = calculate_weighted_relevancy(query_tags_dict, semantic_tags_dict, check_att, margin, target_weights)
-    df.loc[index, 'ner_relevancy_2'] = 2 if semantic_relevancy_score >= 0.7 else (1 if semantic_relevancy_score >= 0.35 else 0)
+    # Add the assistant's judgment of completely unrelated products
+    if len(query_tags_pool & tfidf_tags_pool) >= len(check_att) * margin * 0.5:
+        tfidf_relevancy_score = calculate_weighted_relevancy(query_tags_dict, tfidf_tags_dict, check_att, margin, target_weights)
+        # df.loc[index, 'ner_relevancy_1'] = 2 if tfidf_relevancy_score >= 0.7 else (1 if tfidf_relevancy_score >= 0.35 else 0)
+        df.loc[index, 'ner_relevancy_1'] = 2 if tfidf_relevancy_score >= 0.7 else 1 
+    else:
+        df.loc[index, 'ner_relevancy_1'] = 0
+
+    if len(query_tags_pool & semantic_tags_pool) >= len(check_att) * margin * 0.5:
+        semantic_relevancy_score = calculate_weighted_relevancy(query_tags_dict, semantic_tags_dict, check_att, margin, target_weights)
+        # df.loc[index, 'ner_relevancy_2'] = 2 if semantic_relevancy_score >= 0.7 else (1 if semantic_relevancy_score >= 0.35 else 0)
+        df.loc[index, 'ner_relevancy_2'] = 2 if semantic_relevancy_score >= 0.7 else 1
+    else:
+        df.loc[index, 'ner_relevancy_2'] = 0
     
     return df
 
@@ -97,11 +108,11 @@ all_results = inference_api.get_ner_tags(
         check_att)
 
 # %%
-tag_weights = {'品牌': 1.5, '產品': 1.5, '顏色': 0.5, '適用物體、事件與場所': 1.0, '功能與規格': 1.5}
+tag_weights = {'品牌': 2, '產品': 2, '顏色': 0.5, '適用物體、事件與場所': 1.0, '功能與規格': 2}
 
 for index, row in df.iterrows():
     df = ner_relevancy(df, index, all_results, check_att, margin=0.3, target_weights = tag_weights)
 df
 
 # %%
-df.to_csv('NER-relevancy_modify.csv', index=False, encoding='utf-8-sig')
+df.to_csv('NER-relevancy_modify_test.csv', index=False, encoding='utf-8-sig')
