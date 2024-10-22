@@ -54,6 +54,30 @@ def ner_relevancy(df, index, all_results, check_att, margin, target_weights):
     tfidf_tags_pool = set(ent[0] for ents in tfidf_tags_dict.values() for ent in ents if ent)
     semantic_tags_pool = set(ent[0] for ents in semantic_tags_dict.values() for ent in ents if ent)
 
+    # if df.loc[index, '搜尋詞'] == '開喜':
+    #     print(f'query_tags_dict: {query_tags_dict}')
+    #     print(f'tfidf_tags_dict: {tfidf_tags_dict}')
+    #     print(f'semantic_tags_dict: {semantic_tags_dict}')
+    #     print(f'query_tags_pool: {query_tags_pool}')
+    #     print(f'tfidf_tags_pool: {tfidf_tags_pool}')
+    #     print(f'semantic_tags_pool: {semantic_tags_pool}')
+    #     print(f'len(query_tags_pool & tfidf_tags_pool): {len(query_tags_pool & tfidf_tags_pool)}')
+    #     print(f'len(check_att): {len(check_att)}')
+    #     print(f'len(check_att) * margin * 0.5: {len(check_att) * margin * 0.5}')
+
+    if is_empty_data_structure(query_tags_dict): 
+        df.loc[index, 'ner_relevancy_1'] = '沒有實體'
+        df.loc[index, 'ner_relevancy_2'] = '沒有實體'
+        return df
+    
+    if is_empty_data_structure(tfidf_tags_dict):
+        df.loc[index, 'ner_relevancy_1'] = '沒有實體'
+        return df
+    
+    if is_empty_data_structure(semantic_tags_dict):
+        df.loc[index, 'ner_relevancy_2'] = '沒有實體'
+        return df
+
     # Add the assistant's judgment of completely unrelated products
     if len(query_tags_pool & tfidf_tags_pool) >= len(check_att) * margin * 0.5:
         tfidf_relevancy_score = calculate_weighted_relevancy(query_tags_dict, tfidf_tags_dict, check_att, margin, target_weights)
@@ -99,8 +123,15 @@ def calculate_weighted_relevancy(query_pool, target_pool, check_att, margin, tag
 
     return relevancy_score / total_weight  # Normalize score
 
+def is_empty_data_structure(data):
+    # 遍歷每個主要分類
+    for key, values in data.items():
+        if values:
+            return False
+    return True
+
 # %%
-check_att = ['品牌', '產品', '顏色', '適用物體、事件與場所', '功能與規格']
+check_att = ['品牌', '產品', '顏色', '材質', '適用物體、事件與場所', '功能與規格']
 all_results = inference_api.get_ner_tags(
         model, 
         tokenizer, 
@@ -108,11 +139,11 @@ all_results = inference_api.get_ner_tags(
         check_att)
 
 # %%
-tag_weights = {'品牌': 2, '產品': 2, '顏色': 0.5, '適用物體、事件與場所': 1.0, '功能與規格': 2}
+tag_weights = {'品牌': 2, '產品': 2, '顏色': 0.5, '材質': 1, '適用物體、事件與場所': 1.0, '功能與規格': 2}
 
 for index, row in df.iterrows():
     df = ner_relevancy(df, index, all_results, check_att, margin=0.3, target_weights = tag_weights)
 df
 
 # %%
-df.to_csv('NER-relevancy_modify_test.csv', index=False, encoding='utf-8-sig')
+df.to_csv('NER-relevancy_check_NER.csv', index=False, encoding='utf-8-sig')
